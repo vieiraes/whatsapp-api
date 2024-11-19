@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WhatsApp QR Code</title>
+    <title>Exibir QR Code</title>
     <style>
         body {
             display: flex;
@@ -26,21 +26,25 @@
     <img id="qrCode" alt="QR Code" src="" />
 
     <script>
-        async function fetchQRCode() {
-            try {
-                const response = await fetch('http://localhost:3344/qr');
-                const data = await response.json();
-                document.getElementById('qrCode').src = data.qr;
-            } catch (error) {
-                console.error('Error fetching QR code:', error);
-            }
+        // Simulando a resposta do servidor
+        const qrResponse = {
+            "qr": "2@ChH4VB6t6pLmADJIGauzmwtQOqKpnT22RJh/30TKtgqiMOOJxpJfhm7uiZgTtPBVLJcIBppAwResHmpcmnUWmODmm2LH7zlyClM=,qzBjQpR58EYQRmoIY6aYre/HiW7v2T9rFrnoEjsrtU0=,r5R3I1aSITSqWuFDr7ILklNmRlXk7hlzrdqjpJnHgnw=,BODRk5aC2YIgRCh9CeXjKl039VVCJVxw6GCUv0O5/SA=,1"
+        };
+
+        // Função para decodificar e exibir o QR code
+        function displayQRCode(qrData) {
+            // O QR code está na primeira parte da string (antes da primeira vírgula)
+            const base64String = qrData.split(',')[0];
+
+            // Cria a URL de dados para a imagem
+            const imgSrc = `data:image/png;base64,${base64String}`;
+
+            // Define a fonte da imagem
+            document.getElementById('qrCode').src = imgSrc;
         }
 
-        // Atualiza o QR code a cada 10 segundos
-        setInterval(fetchQRCode, 2000);
-
-        // Carrega o QR code ao iniciar
-        fetchQRCode();
+        // Chama a função para exibir o QR code
+        displayQRCode(qrResponse.qr);
     </script>
 </body>
 
