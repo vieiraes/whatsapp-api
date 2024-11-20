@@ -1,112 +1,142 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
-import { WhatsAppService } from '../services/whatsapp.service';
+import WhatsAppManager from '../services/whatsapp.manager';
 import QRCode from 'qrcode';
-import WhatsAppManager from '../services/whatsapp.manager'
+import { z } from 'zod';
 
+// Schemas de validação
+const phoneNumberSchema = z.object({
+    phoneNumber: z.string().min(1)
+});
 
+const sendMessageSchema = z.object({
+    phoneNumber: z.string().min(1),
+    to: z.string().min(1),
+    message: z.string().min(1)
+});
 
-interface Query {
-    output?: string; // Define que 'output' é um parâmetro opcional
-}
+const webhookSchema = z.object({
+    phoneNumber: z.string().min(1),
+    url: z.string().url()
+});
+
 export class WhatsAppController {
-    private whatsappService: WhatsAppService;
     private whatsappManager: WhatsAppManager;
 
     constructor() {
-        this.whatsappService = new WhatsAppService();
         this.whatsappManager = new WhatsAppManager();
     }
 
-    async initialize(req: FastifyRequest, reply: FastifyReply) {
-        await this.whatsappService.initialize();
-        return reply.send({ message: 'WhatsApp client initialized' });
-    }
-
-    async getQR(req: FastifyRequest<{ Querystring: Query }>, reply: FastifyReply) {
-        const qrData = await this.whatsappService.getQR(); // Obtenha o QR code em formato de string
-
-        // Obtém o parâmetro de consulta 'output'
-        const outputFormat = req.query.output || 'json'; // Default para 'json' se não fornecido
-
+    async addClient(req: FastifyRequest<{ Body: z.infer<typeof phoneNumberSchema> }>, reply: FastifyReply) {
         try {
-            if (outputFormat === 'svg') {
-                const qrImage = await QRCode.toString(qrData.qr, { type: 'svg' });
-                reply.type('image/svg+xml').send(qrImage);
-            } else if (outputFormat === 'png') {
-                const qrImage = await QRCode.toDataURL(qrData.qr, { type: 'image/png' });
-                reply.type('image/png').send(Buffer.from(qrImage.split(',')[1], 'base64'));
-            } else {
-                // Retorna o QR code como JSON
-                reply.send({ qr: qrData.qr });
-            }
-        } catch (error) {
-            reply.status(500).send({ error: 'Error generating QR code' });
-        }
-    }
-
-    async sendMessage(req: FastifyRequest<{ Body: { to: string, message: string } }>, reply: FastifyReply) {
-        const { to, message } = req.body;
-        const result = await this.whatsappService.sendMessage(to, message);
-        return reply.send(result);
-    }
-
-    async getStatus(req: FastifyRequest, reply: FastifyReply) {
-        const status = await this.whatsappService.getStatus();
-        return reply.send({ status });
-    }
-
-    async logout(req: FastifyRequest, reply: FastifyReply) {
-        await this.whatsappService.logout();
-        return reply.send({ message: 'WhatsApp client logged out' });
-    }
-
-
-    async addClient(req: FastifyRequest<{ Body: { phoneNumber: string } }>, reply: FastifyReply) {
-        const { phoneNumber } = req.body;
-
-        if (!phoneNumber) {
-            return reply.status(400).send({ error: 'Phone number is required' });
-        }
-
-        this.whatsappManager.addClient(phoneNumber);
-        return reply.send({ message: `Client for ${phoneNumber} added` });
-    }
-
-
-    async removeClient(req: FastifyRequest<{ Querystring: { phoneNumber: string } }>, reply: FastifyReply) {
-        const { phoneNumber } = req.query;
-
-        if (!phoneNumber) {
-            return reply.status(400).send({ error: 'Phone number is required' });
-        }
-
-        this.whatsappManager.removeClient(phoneNumber);
-        return reply.send({ message: `Client for ${phoneNumber} removed` });
-    }
-
-
-    async setWebhook(req: FastifyRequest<{ Body: { url: string } }>, reply: FastifyReply) {
-        try {
-            console.log('Received webhook request with body:', req.body);
-            const { url } = req.body;
-            if (!url) {
-                console.log('No URL provided in request');
-                return reply.status(400).send({ error: 'Webhook URL is required' });
-            }
-            console.log('Setting webhook URL:', url);
-            this.whatsappService.setWebhook(url);
-            console.log('Webhook set successfully');
+            const { phoneNumber } = phoneNumberSchema.parse(req.body);
+            const client = await this.whatsappManager.addClient(phoneNumber);
             return reply.send({
                 success: true,
-                message: 'Webhook configured successfully',
-                url
+                message: `Client for ${phoneNumber} added`,
+                status: client.status
             });
         } catch (error) {
-            console.error('Error setting webhook:', error);
-            return reply.status(500).send({
+            return reply.status(400).send({
+                success: false,
+                error: error instanceof Error ? error.message : 'Failed to add client'
+            });
+        }
+    }
+
+    async getQR(req: FastifyRequest<{
+        Querystring: { phoneNumber: string, output?: string }
+    }>, reply: FastifyReply) {
+        try {
+            const { phoneNumber, output = 'json' } = req.query;
+            const qrCode = this.whatsappManager.getClientQR(phoneNumber);
+
+            if (!qrCode) {
+                return reply.status(404).send({ error: 'QR Code not available' });
+            }
+
+            if (output === 'svg') {
+                const qrImage = await QRCode.toString(qrCode, { type: 'svg' });
+                return reply.type('image/svg+xml').send(qrImage);
+            } else if (output === 'png') {
+                const qrImage = await QRCode.toDataURL(qrCode);
+                return reply.type('image/png').send(Buffer.from(qrImage.split(',')[1], 'base64'));
+            }
+
+            return reply.send({ qr: qrCode });
+        } catch (error) {
+            return reply.status(400).send({
+                success: false,
+                error: error instanceof Error ? error.message : 'Failed to get QR code'
+            });
+        }
+    }
+
+    async sendMessage(req: FastifyRequest<{ Body: z.infer<typeof sendMessageSchema> }>, reply: FastifyReply) {
+        try {
+            const { phoneNumber, to, message } = sendMessageSchema.parse(req.body);
+            await this.whatsappManager.sendMessage(phoneNumber, to, message);
+            return reply.send({
+                success: true,
+                message: 'Message sent successfully'
+            });
+        } catch (error) {
+            return reply.status(400).send({
+                success: false,
+                error: error instanceof Error ? error.message : 'Failed to send message'
+            });
+        }
+    }
+
+    async getStatus(req: FastifyRequest<{ Querystring: { phoneNumber: string } }>, reply: FastifyReply) {
+        try {
+            const { phoneNumber } = req.query;
+            const status = this.whatsappManager.getClientStatus(phoneNumber);
+            return reply.send({ status });
+        } catch (error) {
+            return reply.status(400).send({
+                success: false,
+                error: error instanceof Error ? error.message : 'Failed to get status'
+            });
+        }
+    }
+
+    async setWebhook(req: FastifyRequest<{ Body: z.infer<typeof webhookSchema> }>, reply: FastifyReply) {
+        try {
+            const { phoneNumber, url } = webhookSchema.parse(req.body);
+            this.whatsappManager.setWebhook(phoneNumber, url);
+            return reply.send({
+                success: true,
+                message: 'Webhook configured successfully'
+            });
+        } catch (error) {
+            return reply.status(400).send({
                 success: false,
                 error: error instanceof Error ? error.message : 'Failed to set webhook'
             });
         }
+    }
+
+    async removeClient(req: FastifyRequest<{ Querystring: { phoneNumber: string } }>, reply: FastifyReply) {
+        try {
+            const { phoneNumber } = req.query;
+            await this.whatsappManager.removeClient(phoneNumber);
+            return reply.send({
+                success: true,
+                message: `Client ${phoneNumber} removed successfully`
+            });
+        } catch (error) {
+            return reply.status(400).send({
+                success: false,
+                error: error instanceof Error ? error.message : 'Failed to remove client'
+            });
+        }
+    }
+
+    async listClients(req: FastifyRequest, reply: FastifyReply) {
+        const clients = this.whatsappManager.getAllClients();
+        return reply.send({
+            success: true,
+            clients
+        });
     }
 }

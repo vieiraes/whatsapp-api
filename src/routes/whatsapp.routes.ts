@@ -4,13 +4,18 @@ import { WhatsAppController } from '../controllers/whatsapp.controller';
 export async function whatsappRoutes(app: FastifyInstance) {
     const controller = new WhatsAppController();
 
-    app.post('/initialize', controller.initialize.bind(controller));
-    app.post('/logout', controller.logout.bind(controller));
-    app.get('/qr', controller.getQR.bind(controller));
-    app.post('/send', controller.sendMessage.bind(controller));
-    app.get('/status', controller.getStatus.bind(controller));
-    app.post('/add-client', controller.addClient.bind(controller));
-    app.post('/remove-client', controller.removeClient.bind(controller));
-    app.post('/webhook', controller.setWebhook.bind(controller));
+    // Gerenciamento de clientes
+    app.post('/clients', controller.addClient.bind(controller));
+    app.get('/clients', controller.listClients.bind(controller));
+    app.delete('/clients', controller.removeClient.bind(controller));
 
+    // Operações específicas de cliente
+    app.get('/clients/qr', controller.getQR.bind(controller));
+    app.get('/clients/status', controller.getStatus.bind(controller));
+    
+    // Webhook
+    app.post('/webhook', controller.setWebhook.bind(controller));
+    
+    // Mensagens
+    app.post('/messages', controller.sendMessage.bind(controller));
 }
