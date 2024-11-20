@@ -1,81 +1,81 @@
 import { Client, LocalAuth } from 'whatsapp-web.js';
 
 class WhatsAppClient {
-  client: Client;
-  qrCode: string | null = null;
-  status: 'initializing' | 'ready' | 'disconnected' = 'initializing';
+    client: Client;
+    qrCode: string | null = null;
+    status: 'initializing' | 'ready' | 'disconnected' = 'initializing';
 
-  constructor(phoneNumber: string) {
-    this.client = new Client({
-      authStrategy: new LocalAuth({
-        clientId: phoneNumber
-      }),
-      puppeteer: { 
-        headless: true,
-        args: ['--no-sandbox']
-      }
-    });
-  }
+    constructor(phoneNumber: string) {
+        this.client = new Client({
+            authStrategy: new LocalAuth({
+                clientId: phoneNumber
+            }),
+            puppeteer: {
+                headless: true,
+                args: ['--no-sandbox']
+            }
+        });
+    }
 }
 
 class WhatsAppManager {
-  private clients: Map<string, WhatsAppClient>;
+    private clients: Map<string, WhatsAppClient>;
 
-  constructor() {
-    this.clients = new Map();
-  }
-
-  async addClient(phoneNumber: string) {
-    if (this.clients.has(phoneNumber)) {
-      throw new Error('Client already exists');
+    constructor() {
+        this.clients = new Map();
     }
 
-    const whatsappClient = new WhatsAppClient(phoneNumber);
-    this.clients.set(phoneNumber, whatsappClient);
+    async addClient(phoneNumber: string) {
+        if (this.clients.has(phoneNumber)) {
+            throw new Error('Client already exists');
+        }
 
-    whatsappClient.client.on('qr', (qr) => {
-      whatsappClient.qrCode = qr;
-    });
+        const whatsappClient = new WhatsAppClient(phoneNumber);
+        this.clients.set(phoneNumber, whatsappClient);
 
-    whatsappClient.client.on('ready', () => {
-      whatsappClient.status = 'ready';
-    });
+        whatsappClient.client.on('qr', (qr) => {
+            whatsappClient.qrCode = qr;
+        });
 
-    whatsappClient.client.on('disconnected', () => {
-      whatsappClient.status = 'disconnected';
-    });
+        whatsappClient.client.on('ready', () => {
+            whatsappClient.status = 'ready';
+        });
 
-    await whatsappClient.client.initialize();
-    return whatsappClient;
-  }
+        whatsappClient.client.on('disconnected', () => {
+            whatsappClient.status = 'disconnected';
+        });
 
-  getClient(phoneNumber: string) {
-    const client = this.clients.get(phoneNumber);
-    if (!client) {
-      throw new Error('Client not found');
+        await whatsappClient.client.initialize();
+        return whatsappClient;
     }
-    return client;
-  }
 
-  async removeClient(phoneNumber: string) {
-    const client = this.clients.get(phoneNumber);
-    if (client) {
-      await client.client.destroy();
-      this.clients.delete(phoneNumber);
+    getClient(phoneNumber: string) {
+        const client = this.clients.get(phoneNumber);
+        if (!client) {
+            throw new Error('Client not found');
+        }
+        return client;
     }
-  }
 
-  getClientStatus(phoneNumber: string) {
-    return this.getClient(phoneNumber).status;
-  }
+    async removeClient(phoneNumber: string) {
+        const client = this.clients.get(phoneNumber);
+        if (client) {
+            await client.client.destroy();
+            this.clients.delete(phoneNumber);
+        }
+    }
 
-  getClientQR(phoneNumber: string) {
-    return this.getClient(phoneNumber).qrCode;
-  }
+    getClientStatus(phoneNumber: string) {
+        return this.getClient(phoneNumber).status;
+    }
 
-  getAllClients() {
-    return Array.from(this.clients.keys());
-  }
+    getClientQR(phoneNumber: string) {
+        return this.getClient(phoneNumber).qrCode;
+    }
+
+    getAllClients() {
+        return Array.from(this.clients.keys());
+    }
 }
 
 export default WhatsAppManager;

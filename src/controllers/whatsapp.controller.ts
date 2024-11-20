@@ -1,7 +1,7 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { WhatsAppService } from '../services/whatsapp.service';
 import QRCode from 'qrcode';
-import  WhatsAppManager  from '../services/whatsapp.manager'
+import WhatsAppManager from '../services/whatsapp.manager'
 
 
 
@@ -82,5 +82,23 @@ export class WhatsAppController {
 
         this.whatsappManager.removeClient(phoneNumber);
         return reply.send({ message: `Client for ${phoneNumber} removed` });
+    }
+
+
+    async setWebhook(req: FastifyRequest<{ Body: { url: string } }>, reply: FastifyReply) {
+        const { url } = req.body;
+        if (!url) {
+            return reply.status(400).send({ error: 'Webhook URL is required' });
+        }
+
+        try {
+            this.whatsappService.setWebhook(url);
+            return reply.send({ success: true, message: 'Webhook configured successfully' });
+        } catch (error) {
+            return reply.status(500).send({
+                success: false,
+                error: error instanceof Error ? error.message : 'Failed to set webhook'
+            });
+        }
     }
 }
