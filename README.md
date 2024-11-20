@@ -158,6 +158,43 @@ O webhook configurado receberá os seguintes eventos:
 4. Monitorar eventos do webhook para controle do estado da conexão
 5. Tratar reconexões quando necessário
 
+
+## 📊 Status do Cliente
+
+Os clientes WhatsApp podem ter os seguintes status:
+
+### initializing
+- Estado inicial quando o cliente é criado
+- O cliente está preparando a conexão
+- QR code será gerado em breve
+- Ainda não é possível enviar mensagens
+
+### ready
+- Cliente está conectado e autenticado
+- QR code foi escaneado com sucesso
+- Pronto para enviar e receber mensagens
+- Conexão com WhatsApp estabelecida
+
+### disconnected
+- Cliente perdeu conexão ou foi desconectado
+- Pode ocorrer por:
+  - Logout do WhatsApp Web
+  - Perda de conexão com internet
+  - Desconexão manual
+  - Logout em outro dispositivo
+- Necessário reiniciar o cliente ou gerar novo QR code
+
+### Fluxo típico de status:
+1. `initializing` → Cliente criado
+2. `ready` → QR code escaneado com sucesso
+3. `disconnected` → Se a conexão for perdida
+
+### Boas práticas:
+- Sempre verificar o status antes de enviar mensagens
+- Monitorar mudanças de status via webhook
+- Implementar reconexão automática quando status for `disconnected`
+- Aguardar status `ready` antes de operações críticas
+
 ## 🤝 Contribuindo
 
 Contribuições são bem-vindas! Por favor, leia as diretrizes de contribuição antes de submeter um PR.
