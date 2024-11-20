@@ -86,15 +86,23 @@ export class WhatsAppController {
 
 
     async setWebhook(req: FastifyRequest<{ Body: { url: string } }>, reply: FastifyReply) {
-        const { url } = req.body;
-        if (!url) {
-            return reply.status(400).send({ error: 'Webhook URL is required' });
-        }
-
         try {
+            console.log('Received webhook request with body:', req.body);
+            const { url } = req.body;
+            if (!url) {
+                console.log('No URL provided in request');
+                return reply.status(400).send({ error: 'Webhook URL is required' });
+            }
+            console.log('Setting webhook URL:', url);
             this.whatsappService.setWebhook(url);
-            return reply.send({ success: true, message: 'Webhook configured successfully' });
+            console.log('Webhook set successfully');
+            return reply.send({
+                success: true,
+                message: 'Webhook configured successfully',
+                url
+            });
         } catch (error) {
+            console.error('Error setting webhook:', error);
             return reply.status(500).send({
                 success: false,
                 error: error instanceof Error ? error.message : 'Failed to set webhook'

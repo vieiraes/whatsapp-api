@@ -11,20 +11,32 @@ export class WhatsAppService {
     constructor(clientId: string = 'default') {
         this.clientId = clientId;
         this.webhookService = new WebhookService();
-        
+
         const options: ClientOptions = {
-            puppeteer: { headless: true },
+            puppeteer: {
+                headless: true,
+                args: [
+                    '--no-sandbox',
+                    '--disable-setuid-sandbox',
+                    '--disable-dev-shm-usage',
+                    '--disable-accelerated-2d-canvas',
+                    '--no-first-run',
+                    '--no-zygote',
+                    '--disable-gpu'
+                ]
+            },
             authStrategy: new LocalAuth({
                 clientId: this.clientId
             })
         };
-        
+
         this.client = new Client(options);
         this.setupEvents();
     }
 
     private setupEvents() {
         this.client.on('qr', (qr) => {
+            console.log('Novo QR Code recebido');
             this.qrCode = qr;
             qrcode.generate(qr, { small: true });
             this.webhookService.sendWebhook(this.clientId, 'qr', { qr });
@@ -35,22 +47,38 @@ export class WhatsAppService {
             this.webhookService.sendWebhook(this.clientId, 'ready', { status: 'ready' });
         });
 
-        this.client.on('message_create', async (message: Message) => {
+        this.client.on('auth_failure', (msg) => {
+            console.error('Falha na autenticação:', msg);
+            this.webhookService.sendWebhook(this.clientId, 'auth_failure', { error: msg });
+        });
+
+        this.client.on('disconnected', (reason) => {
+            console.log('Cliente desconectado:', reason);
+            this.webhookService.sendWebhook(this.clientId, 'disconnected', { reason });
+        });
+
+        this.client.on('message_create', async (message) => {
             console.log(`Received message: ${message.body}`);
-            
             const messageData = {
                 from: message.from,
                 body: message.body,
                 timestamp: message.timestamp,
                 type: message.type
             };
-            
             this.webhookService.sendWebhook(this.clientId, 'message', messageData);
         });
     }
 
+
     async initialize() {
-        await this.client.initialize();
+        try {
+            console.log('Iniciando cliente WhatsApp...');
+            await this.client.initialize();
+            console.log('Cliente inicializado com sucesso');
+        } catch (error) {
+            console.error('Erro ao inicializar cliente:', error);
+            throw error;
+        }
     }
 
     async getQR() {
@@ -71,9 +99,5 @@ export class WhatsAppService {
 
     setWebhook(url: string) {
         this.webhookService.setWebhook(this.clientId, url);
-    }
-
-    getWebhook(): string | undefined {
-        return this.webhookService.getWebhook(this.clientId);
     }
 }

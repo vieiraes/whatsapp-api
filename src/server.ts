@@ -4,6 +4,10 @@ import { whatsappRoutes } from './routes/whatsapp.routes';
 const app = fastify();
 
 app.register(whatsappRoutes);
+app.addHook('onRequest', (request, reply, done) => {
+    console.log(`${request.method} ${request.url}`);
+    done();
+});
 
 
 const start = async () => {

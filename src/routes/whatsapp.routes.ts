@@ -11,4 +11,6 @@ export async function whatsappRoutes(app: FastifyInstance) {
     app.get('/status', controller.getStatus.bind(controller));
     app.post('/add-client', controller.addClient.bind(controller));
     app.post('/remove-client', controller.removeClient.bind(controller));
+    app.post('/webhook', controller.setWebhook.bind(controller));
+
 }
