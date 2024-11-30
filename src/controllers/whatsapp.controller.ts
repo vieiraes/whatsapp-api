@@ -138,12 +138,17 @@ export class WhatsAppController {
 
     async listClients(req: FastifyRequest, reply: FastifyReply) {
         try {
-            const { page, limit } = listClientsQuerySchema.parse(req.query);
+            const { page, limit, status } = listClientsQuerySchema.parse(req.query);
 
-            const allClients = this.whatsappManager.getAllClients();
+            let allClients = this.whatsappManager.getAllClients();
+
+            // Filtra por status se fornecido
+            if (status) {
+                allClients = allClients.filter(client => client.status === status);
+            }
+
             const totalClients = allClients.length;
             const totalPages = Math.ceil(totalClients / limit);
-
             const startIndex = (page - 1) * limit;
             const endIndex = startIndex + limit;
             const paginatedClients = allClients.slice(startIndex, endIndex);
@@ -172,6 +177,5 @@ export class WhatsAppController {
             }
             throw error;
         }
-
     }
 }

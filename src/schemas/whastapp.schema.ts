@@ -19,7 +19,10 @@ export const listClientsQuerySchema = z.object({
         .string()
         .optional()
         .transform((val) => (val ? parseInt(val) : 10))
-        .pipe(z.number().min(1).max(100).int())
+        .pipe(z.number().min(1).max(100).int()),
+    status: z
+        .enum(['initializing', 'ready', 'disconnected'])
+        .optional()
 });
 
 export type SendMessageInput = z.infer<typeof sendMessageSchema>;
