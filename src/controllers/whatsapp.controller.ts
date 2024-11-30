@@ -2,7 +2,7 @@ import { FastifyRequest, FastifyReply } from 'fastify';
 import WhatsAppManager from '../services/whatsapp.manager';
 import QRCode from 'qrcode';
 import { z } from 'zod';
-
+import { listClientsQuerySchema } from '../schemas/whastapp.schema';
 // Schemas de validação
 const phoneNumberSchema = z.object({
     phoneNumber: z.string().min(1)
@@ -32,8 +32,12 @@ export class WhatsAppController {
             const client = await this.whatsappManager.addClient(phoneNumber);
             return reply.send({
                 success: true,
-                message: `Client for ${phoneNumber} added`,
-                status: client.status
+                data: {
+                    phoneNumber,
+                    createdAt: client.createdAt,
+                    status: client.status
+                },
+                message: `Client for ${phoneNumber} added`
             });
         } catch (error) {
             return reply.status(400).send({
@@ -133,10 +137,41 @@ export class WhatsAppController {
     }
 
     async listClients(req: FastifyRequest, reply: FastifyReply) {
-        const clients = this.whatsappManager.getAllClients();
-        return reply.send({
-            success: true,
-            clients
-        });
+        try {
+            const { page, limit } = listClientsQuerySchema.parse(req.query);
+
+            const allClients = this.whatsappManager.getAllClients();
+            const totalClients = allClients.length;
+            const totalPages = Math.ceil(totalClients / limit);
+
+            const startIndex = (page - 1) * limit;
+            const endIndex = startIndex + limit;
+            const paginatedClients = allClients.slice(startIndex, endIndex);
+
+            return reply.send({
+                success: true,
+                data: {
+                    clients: paginatedClients,
+                    pagination: {
+                        currentPage: page,
+                        totalPages,
+                        totalClients,
+                        limit,
+                        hasNext: page < totalPages,
+                        hasPrevious: page > 1
+                    }
+                }
+            });
+        } catch (error) {
+            if (error instanceof z.ZodError) {
+                return reply.code(400).send({
+                    success: false,
+                    error: 'Parâmetros de consulta inválidos',
+                    details: error.errors
+                });
+            }
+            throw error;
+        }
+
     }
 }

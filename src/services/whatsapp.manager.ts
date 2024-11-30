@@ -5,9 +5,12 @@ class WhatsAppClient {
     client: Client;
     qrCode: string | null = null;
     status: 'initializing' | 'ready' | 'disconnected' = 'initializing';
+    createdAt: Date;
+    deletedAt: Date | null = null;
     private webhookService: WebhookService;
 
     constructor(phoneNumber: string) {
+        this.createdAt = new Date();
         this.webhookService = new WebhookService();
         this.client = new Client({
             authStrategy: new LocalAuth({
@@ -18,33 +21,40 @@ class WhatsAppClient {
                 args: ['--no-sandbox']
             }
         });
-
         this.setupEvents(phoneNumber);
     }
 
     private setupEvents(phoneNumber: string) {
         this.client.on('qr', (qr) => {
             this.qrCode = qr;
-            this.webhookService.sendWebhook(phoneNumber, 'qr', { qr });
+            if (this.webhookService.hasWebhook(phoneNumber)) {
+                this.webhookService.sendWebhook(phoneNumber, 'qr', { qr });
+            }
         });
 
         this.client.on('ready', () => {
             this.status = 'ready';
-            this.webhookService.sendWebhook(phoneNumber, 'ready', { status: 'ready' });
+            if (this.webhookService.hasWebhook(phoneNumber)) {
+                this.webhookService.sendWebhook(phoneNumber, 'ready', { status: 'ready' });
+            }
         });
 
         this.client.on('disconnected', () => {
             this.status = 'disconnected';
-            this.webhookService.sendWebhook(phoneNumber, 'disconnected', { status: 'disconnected' });
+            if (this.webhookService.hasWebhook(phoneNumber)) {
+                this.webhookService.sendWebhook(phoneNumber, 'disconnected', { status: 'disconnected' });
+            }
         });
 
         this.client.on('message_create', async (message) => {
-            this.webhookService.sendWebhook(phoneNumber, 'message', {
-                from: message.from,
-                body: message.body,
-                timestamp: message.timestamp,
-                type: message.type
-            });
+            if (this.webhookService.hasWebhook(phoneNumber)) {
+                this.webhookService.sendWebhook(phoneNumber, 'message', {
+                    from: message.from,
+                    body: message.body,
+                    timestamp: message.timestamp,
+                    type: message.type
+                });
+            }
         });
     }
 
@@ -86,6 +96,7 @@ class WhatsAppManager {
     async removeClient(phoneNumber: string) {
         const client = this.clients.get(phoneNumber);
         if (client) {
+            client.deletedAt = new Date();
             await client.client.destroy();
             this.clients.delete(phoneNumber);
         }
@@ -100,7 +111,14 @@ class WhatsAppManager {
     }
 
     getAllClients() {
-        return Array.from(this.clients.keys());
+        const clientsArray = Array.from(this.clients.entries()).map(([phoneNumber, client]) => ({
+            phoneNumber,
+            createdAt: client.createdAt,
+            deletedAt: client.deletedAt,
+            status: client.status
+        }));
+
+        return clientsArray.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
     }
 
     async sendMessage(phoneNumber: string, to: string, message: string) {
